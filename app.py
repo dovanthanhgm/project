@@ -1,24 +1,21 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from flask import render_template, render_template_string, request, redirect
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
 app = Flask(__name__)
 app.config.update({
-    'SECRET_KEY': 'do-or-do-not-there-is-no-try',
-    'SQLALCHEMY_DATABASE_URI': f"sqlite:///{os.path.join(basedir, 'app.db')}",
-    'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+    'SECRET_KEY': 'secret_key',
+    'SQLALCHEMY_DATABASE_URI': f'sqlite:///{basedir}/app.db',
 })
 db = SQLAlchemy(app)
-migrate = Migrate(app, db)
 class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(64), index=True, nullable=False)
     description = db.Column(db.String(120), index=True, nullable=False)
     status = db.Column(db.Boolean, default=False)
+with app.app_context(): db.create_all()
 
 @app.route('/')
 @app.route('/index')
@@ -55,41 +52,39 @@ def add():
             return redirect('/')
     return "Never give up"
 
-@app.route('/update/<int:id>')
-def updateRoute(id):
-    if not id or id != 0:
-        entry = Entry.query.get(id)
-        if entry:
-            return render_template_string(
-                """
-                <form action="/update/{{ entry.id }}" method="post">
-                    <input type="text" name="title" value="{{ entry.title }}">
-                    <textarea name="description">{{ entry.description }}</textarea>
-                    <button type="submit">Update</button>
-                </form>
-                """,
-                entry=entry
-            )
-    return "Never give up"
-
-@app.route('/update/<int:id>', methods=['POST'])
+@app.route('/update/<int:id>', methods=['GET', 'POST'])
 def update(id):
-    if not id or id != 0:
-        entry = Entry.query.get(id)
-        if entry:
-            form = request.form
-            title = form.get('title')
-            description = form.get('description')
-            entry.title = title
-            entry.description = description
-            db.session.commit()
-        return redirect('/')
+    if request.method == 'POST':
+        if not id or id != 0:
+            entry = db.session.get(Entry, id)
+            if entry:
+                form = request.form
+                title = form.get('title')
+                description = form.get('description')
+                entry.title = title
+                entry.description = description
+                db.session.commit()
+            return redirect('/')
+    elif request.method == 'GET':
+        if not id or id != 0:
+            entry = db.session.get(Entry, id)
+            if entry:
+                return render_template_string(
+                    """
+                    <form action="/update/{{ entry.id }}" method="post">
+                        <input type="text" name="title" value="{{ entry.title }}">
+                        <textarea name="description">{{ entry.description }}</textarea>
+                        <button type="submit">Update</button>
+                    </form>
+                    """,
+                    entry = entry
+                )
     return "Never give up"
 
 @app.route('/delete/<int:id>')
 def delete(id):
     if not id or id != 0:
-        entry = Entry.query.get(id)
+        entry = db.session.get(Entry, id)
         if entry:
             db.session.delete(entry)
             db.session.commit()
@@ -99,7 +94,7 @@ def delete(id):
 @app.route('/turn/<int:id>')
 def turn(id):
     if not id or id != 0:
-        entry = Entry.query.get(id)
+        entry = db.session.get(Entry, id)
         if entry:
             entry.status = not entry.status
             db.session.commit()
