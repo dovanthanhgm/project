@@ -1,7 +1,7 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask import render_template, render_template_string, request, redirect
+from flask import render_template, render_template_string, request, redirect, abort
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
@@ -16,6 +16,10 @@ class Entry(db.Model):
     description = db.Column(db.String(120), index=True, nullable=False)
     status = db.Column(db.Boolean, default=False)
 with app.app_context(): db.create_all()
+
+@app.errorhandler(404)
+def page_not_found(error):
+    return f'{error.description}', 404
 
 @app.route('/')
 @app.route('/index')
@@ -54,32 +58,26 @@ def add():
 
 @app.route('/update/<int:id>', methods=['GET', 'POST'])
 def update(id):
+    entry = db.session.get(Entry, id)
+    if not entry: return abort(404, description="Cannot get Entry")
     if request.method == 'POST':
-        if not id or id != 0:
-            entry = db.session.get(Entry, id)
-            if entry:
-                form = request.form
-                title = form.get('title')
-                description = form.get('description')
-                entry.title = title
-                entry.description = description
-                db.session.commit()
-            return redirect('/')
-    elif request.method == 'GET':
-        if not id or id != 0:
-            entry = db.session.get(Entry, id)
-            if entry:
-                return render_template_string(
-                    """
-                    <form action="/update/{{ entry.id }}" method="post">
-                        <input type="text" name="title" value="{{ entry.title }}">
-                        <textarea name="description">{{ entry.description }}</textarea>
-                        <button type="submit">Update</button>
-                    </form>
-                    """,
-                    entry = entry
-                )
-    return "Never give up"
+        form = request.form
+        title = form.get('title')
+        description = form.get('description')
+        entry.title = title
+        entry.description = description
+        db.session.commit()
+        return redirect('/')
+    return render_template_string(
+        """
+        <form action="/update/{{ entry.id }}" method="post">
+            <input type="text" name="title" value="{{ entry.title }}">
+            <textarea name="description">{{ entry.description }}</textarea>
+            <button type="submit">Update</button>
+        </form>
+        """,
+        entry = entry
+    )
 
 @app.route('/delete/<int:id>')
 def delete(id):
