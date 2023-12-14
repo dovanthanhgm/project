@@ -14,6 +14,8 @@ class Entry(db.Model):
     title = db.Column(db.String(64), index=True, nullable=False)
     description = db.Column(db.String(120), index=True, nullable=False)
     status = db.Column(db.Boolean, default=False)
+    def json(self):
+        return {'id': self.id,'title': self.title, 'description': self.description, 'status': self.status}
 with app.app_context(): db.create_all()
 ##############################
 # Test App
@@ -97,6 +99,12 @@ app.register_blueprint(test_app, url_prefix='/test_app')
 ##############################
 # API
 api = Blueprint('api', __name__)
+@api.route('/list', methods=['GET'])
+def list():
+    entries = Entry.query.all()
+    if entries:
+        return make_response(jsonify([entry.json() for entry in entries]), 200)
+    return 'Something went wrong'
 @api.route('/add', methods=['POST'])
 def add():
     try: data = request.get_json()
