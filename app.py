@@ -1,7 +1,6 @@
 import os
-from flask import Flask
+from flask import Flask, render_template, render_template_string, request, redirect, abort
 from flask_sqlalchemy import SQLAlchemy
-from flask import render_template, render_template_string, request, redirect, abort
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
