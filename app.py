@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, render_template_string, request, redirect, abort
+from flask import Flask, render_template_string, request, redirect, abort, jsonify, make_response, Blueprint, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -15,34 +15,10 @@ class Entry(db.Model):
     description = db.Column(db.String(120), index=True, nullable=False)
     status = db.Column(db.Boolean, default=False)
 with app.app_context(): db.create_all()
-
-@app.errorhandler(404)
-def page_not_found(error):
-    return f'{error.description}', 404
-
-@app.route('/')
-@app.route('/index')
-def index():
-    entries = Entry.query.all()
-    return render_template_string(
-        """
-        <form action="/add" method="post">
-            <input type="text" name="title">
-            <textarea name="description"></textarea>
-            <button type="submit">Add</button>
-        </form>
-        {% for entry in entries %}
-            {{ entry.id }}.{{ entry.title }}({{ entry.status }}):{{ entry.description }}
-            <a href="/turn/{{ entry.id }}">Toggle</a>
-            <a href="/delete/{{ entry.id }}">Delete</a>
-            <a href="/update/{{ entry.id }}">Edit</a>
-            <br/>
-        {% endfor %}
-        """,
-        entries=entries
-    )
-
-@app.route('/add', methods=['POST'])
+##############################
+# Test App
+test_app = Blueprint('test_app', __name__)
+@test_app.route('/add', methods=['POST'])
 def add():
     if request.method == 'POST':
         form = request.form
@@ -52,10 +28,9 @@ def add():
             entry = Entry(title = title, description = description)
             db.session.add(entry)
             db.session.commit()
-            return redirect('/')
-    return "Never give up"
-
-@app.route('/update/<int:id>', methods=['GET', 'POST'])
+            return redirect(url_for('test_app.index'))
+    return 'Something went wrong'
+@test_app.route('/update/<int:id>', methods=['GET', 'POST'])
 def update(id):
     entry = db.session.get(Entry, id)
     if not entry: return abort(404, description="Cannot get Entry")
@@ -66,10 +41,10 @@ def update(id):
         entry.title = title
         entry.description = description
         db.session.commit()
-        return redirect('/')
+        return redirect(url_for('test_app.index'))
     return render_template_string(
         """
-        <form action="/update/{{ entry.id }}" method="post">
+        <form action="{{ url_for('test_app.update', id=entry.id) }}" method="post">
             <input type="text" name="title" value="{{ entry.title }}">
             <textarea name="description">{{ entry.description }}</textarea>
             <button type="submit">Update</button>
@@ -77,26 +52,63 @@ def update(id):
         """,
         entry = entry
     )
-
-@app.route('/delete/<int:id>')
+@test_app.route('/delete/<int:id>')
 def delete(id):
     if not id or id != 0:
         entry = db.session.get(Entry, id)
         if entry:
             db.session.delete(entry)
             db.session.commit()
-        return redirect('/')
-    return "Never give up"
-
-@app.route('/turn/<int:id>')
+        return redirect(url_for('test_app.index'))
+    return 'Something went wrong'
+@test_app.route('/turn/<int:id>')
 def turn(id):
     if not id or id != 0:
         entry = db.session.get(Entry, id)
         if entry:
             entry.status = not entry.status
             db.session.commit()
-        return redirect('/')
-    return "Never give up"
+        return redirect(url_for('test_app.index'))
+    return 'Something went wrong'
+@test_app.route('/')
+def index():
+    entries = Entry.query.all()
+    return render_template_string(
+        """
+        <form action="{{ url_for('test_app.add') }}" method="post">
+            <input type="text" name="title">
+            <textarea name="description"></textarea>
+            <button type="submit">Add</button>
+        </form>
+        {% for entry in entries %}
+            {{ entry.id }}.{{ entry.title }}({{ entry.status }}):{{ entry.description }}
+            <a href="{{ url_for('test_app.turn', id=entry.id) }}">Toggle</a>
+            <a href="{{ url_for('test_app.delete', id=entry.id) }}">Delete</a>
+            <a href="{{ url_for('test_app.update', id=entry.id) }}">Edit</a>
+            <br/>
+        {% endfor %}
+        """,
+        entries=entries
+    )
+@test_app.errorhandler(404)
+def page_not_found(error):
+    return f'{error.description}', 404
+app.register_blueprint(test_app, url_prefix='/test_app')
+##############################
+# API
+api = Blueprint('api', __name__)
+@api.route('/add', methods=['POST'])
+def add():
+    try: data = request.get_json()
+    except: data = request.form
+    if data:
+        entry = Entry(title=data['title'], description=data['description'])
+        db.session.add(entry)
+        db.session.commit()
+        return make_response(jsonify({'message': 'success'}), 201)
+    return 'Something went wrong'
+app.register_blueprint(api, url_prefix='/api')
+##############################
 
 if __name__ == '__main__':
 	app.run(host = '0.0.0.0', port = 5000, debug=True)
