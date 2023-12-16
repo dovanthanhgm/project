@@ -16,24 +16,6 @@ class Product(db.Model):
     def json(self): return {'id': self.id, 'title': self.title, 'description': self.description, 'image': self.image, 'created_at': self.created_at}
 with app.app_context(): db.create_all()
 ##################################################
-api = Blueprint('api', __name__)
-@api.route('/list', methods=['GET'])
-def list():
-    products = Product.query.all()
-    if products: return make_response(jsonify([product.json() for product in products]), 200)
-    return 'Something went wrong'
-@api.route('/add', methods=['POST'])
-def add():
-    try: data = request.get_json()
-    except: data = request.form
-    if data:
-        product = Product(title=data['title'], description=data['description'], image=data['image'])
-        db.session.add(product)
-        db.session.commit()
-        return make_response(jsonify({'message': 'success'}), 201)
-    return 'Something went wrong'
-app.register_blueprint(api, url_prefix='/api')
-##################################################
 from flask import render_template_string
 shop = Blueprint('shop', __name__)
 @shop.route('/home')
@@ -89,6 +71,24 @@ def add():
         """,
     )
 app.register_blueprint(shop, url_prefix='/shop')
+##################################################
+api = Blueprint('api', __name__)
+@api.route('/list', methods=['GET'])
+def list():
+    products = Product.query.all()
+    if products: return make_response(jsonify([product.json() for product in products]), 200)
+    return 'Something went wrong'
+@api.route('/add', methods=['POST'])
+def add():
+    try: data = request.get_json()
+    except: data = request.form
+    if data:
+        product = Product(title=data['title'], description=data['description'], image=data['image'])
+        db.session.add(product)
+        db.session.commit()
+        return make_response(jsonify({'message': 'success'}), 201)
+    return 'Something went wrong'
+app.register_blueprint(api, url_prefix='/api')
 ##################################################
 from flask import render_template_string
 shop_v2 = Blueprint('shop_v2', __name__)
